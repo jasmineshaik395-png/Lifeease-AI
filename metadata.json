@@ -1,0 +1,6 @@
+{
+  "name": "LifeEase AI – Your Everyday Life Simplifier",
+  "description": "An intelligent daily life planner and task simplifier powered by Gemini AI, featuring automated scheduling, smart disruption rescheduling, and real-time productivity tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
