@@ -26,6 +26,8 @@ export interface Task {
   completed: boolean;
   completedAt?: string;
   createdAt: string;
+  updatedAt?: string;
+  isSample?: boolean;
   subtasks?: Subtask[];
 }
 
@@ -41,6 +43,8 @@ export interface ScheduleItem {
   reason?: string;
   productivityTip?: string;
   completed: boolean;
+  hasConflict?: boolean;
+  conflictReason?: string;
 }
 
 export interface DailyPlan {
@@ -53,6 +57,12 @@ export interface DailyPlan {
   peakEnergyWindow: string;
   workloadStatus: 'manageable' | 'optimal' | 'heavy' | 'overloaded';
   recommendations: string[];
+  conflicts?: string[];
+  isFallbackPlan?: boolean;
+  isHistorical?: boolean;
+  deferredTasks?: Array<{ taskTitle: string; reason: string }>;
+  focusScoreBreakdown?: { capacity: number; priority: number; breaks: number; deadlines: number };
+  modelUsed?: string;
 }
 
 export interface UserPreferences {
@@ -85,4 +95,5 @@ export interface RescheduleResult {
     reason: string;
   }>;
   reliefTip: string;
+  conflictsDetected?: string[];
 }

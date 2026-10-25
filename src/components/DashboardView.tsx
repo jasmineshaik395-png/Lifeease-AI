@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   CheckCircle2,
   Clock,
@@ -10,11 +10,21 @@ import {
   Flame,
   Plus,
   RefreshCw,
-  Award,
-  Layers,
+  Bell,
+  BellOff,
+  BellRing,
+  AlertTriangle,
 } from 'lucide-react';
 import { Task, DailyPlan, TaskCategory } from '../types';
 import { ActiveTab } from './Navbar';
+import { AiAssistantBar } from './AiAssistantBar';
+import {
+  isNotificationSupported,
+  getNotificationPermission,
+  requestNotificationPermission,
+  getActiveReminders,
+  sendBrowserNotification,
+} from '../utils/notifications';
 import confetti from 'canvas-confetti';
 
 interface DashboardViewProps {
@@ -22,8 +32,11 @@ interface DashboardViewProps {
   dailyPlan: DailyPlan | null;
   onToggleTask: (taskId: string) => void;
   onQuickAddTask: (title: string, category: TaskCategory) => void;
+  onTaskCreatedFromAi: (task: Task) => void;
   setActiveTab: (tab: ActiveTab) => void;
   onOpenNewTaskModal: () => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  onGoToReschedule?: (preset?: string) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -31,11 +44,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   dailyPlan,
   onToggleTask,
   onQuickAddTask,
+  onTaskCreatedFromAi,
   setActiveTab,
   onOpenNewTaskModal,
+  showToast,
+  onGoToReschedule,
 }) => {
   const [quickTitle, setQuickTitle] = useState('');
   const [quickCategory, setQuickCategory] = useState<TaskCategory>('work');
+  const [notifPerm, setNotifPerm] = useState(getNotificationPermission());
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter((t) => t.completed).length;
@@ -46,12 +63,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalEstimatedHours = (totalEstimatedMinutes / 60).toFixed(1);
 
   const highPriorityPending = tasks.filter((t) => !t.completed && t.priority === 'high').length;
+  const activeReminders = getActiveReminders(tasks);
 
   const handleQuickAdd = (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickTitle.trim()) return;
     onQuickAddTask(quickTitle.trim(), quickCategory);
     setQuickTitle('');
+    showToast(`Task added: "${quickTitle.trim()}"`, 'success');
   };
 
   const handleTaskCheck = (taskId: string, isCurrentlyCompleted: boolean) => {
@@ -62,10 +81,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         spread: 60,
         origin: { y: 0.7 },
       });
+      showToast('Task completed! Keep up the momentum! 🎉', 'success');
     }
   };
 
-  // Format today's date nicely
+  const handleEnableNotifications = async () => {
+    const perm = await requestNotificationPermission();
+    setNotifPerm(perm);
+    if (perm === 'granted') {
+      sendBrowserNotification('LifeEase AI Reminders Active', 'We will alert you for upcoming tasks and deadlines.');
+      showToast('Browser notifications enabled! You will receive timely alerts.', 'success');
+    } else if (perm === 'denied') {
+      showToast('Notifications blocked in browser settings. Please allow notifications for this site.', 'error');
+    }
+  };
+
   const todayFormatted = new Date().toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'short',
@@ -73,13 +103,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   });
 
   return (
-    <div className="space-y-8 pb-12">
+    <div className="space-y-8 pb-14">
       {/* Top Welcome Bar */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-3xl p-6 sm:p-8 text-white shadow-lg relative overflow-hidden">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="space-y-1.5">
             <div className="flex items-center space-x-2 text-blue-200 text-xs sm:text-sm font-medium">
               <Calendar className="w-4 h-4" />
               <span>{todayFormatted}</span>
@@ -92,22 +122,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
               Welcome to Your Simplified Day!
             </h1>
-            <p className="text-blue-100 text-sm max-w-xl">
-              Focus on one task at a time. Let LifeEase AI balance your cognitive workload and keep everyday stress off your shoulders.
+            <p className="text-blue-100 text-xs sm:text-sm max-w-xl">
+              Focus on what matters most. Let Gemini balance your cognitive workload and protect your everyday peace of mind.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <button
               onClick={() => setActiveTab('planner')}
-              className="px-4 py-2.5 rounded-xl bg-white text-indigo-900 font-bold text-sm shadow-md hover:bg-blue-50 transition-all flex items-center space-x-2 cursor-pointer"
+              className="px-4 py-2.5 rounded-xl bg-white text-indigo-900 font-bold text-xs sm:text-sm shadow-md hover:bg-blue-50 transition-all flex items-center space-x-2 cursor-pointer"
             >
               <Sparkles className="w-4 h-4 text-purple-600" />
               <span>{dailyPlan ? 'View AI Schedule' : 'Generate Daily Plan'}</span>
             </button>
             <button
-              onClick={() => setActiveTab('reschedule')}
-              className="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/20 text-white font-medium text-sm border border-white/25 transition-all flex items-center space-x-2 cursor-pointer"
+              onClick={() => (onGoToReschedule ? onGoToReschedule('time_lost') : setActiveTab('reschedule'))}
+              className="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/20 text-white font-medium text-xs sm:text-sm border border-white/25 transition-all flex items-center space-x-2 cursor-pointer"
             >
               <RefreshCw className="w-4 h-4" />
               <span>Reschedule</span>
@@ -115,6 +145,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* AI Assistant Natural Language Bar */}
+      <AiAssistantBar onTaskCreated={onTaskCreatedFromAi} showToast={showToast} />
 
       {/* 4 Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
@@ -189,7 +222,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {highPriorityPending}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {highPriorityPending === 0 ? 'All clear!' : 'Needs your focus today'}
+              {highPriorityPending === 0 ? 'All critical items clear!' : 'Needs focus today'}
             </p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
@@ -216,7 +249,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* Main Grid: Today's Tasks & AI Schedule Snapshot */}
+      {/* Main Grid: Checklist & Reminders/Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left 2 Columns: Task Checklist & Quick Add */}
         <div className="lg:col-span-2 space-y-6">
@@ -230,8 +263,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 type="text"
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
-                placeholder="What do you need to do? (e.g. Finish chemistry assignment)"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-slate-900 placeholder-slate-400"
+                placeholder="Quick manual task add (e.g. Call dentist)..."
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white text-slate-900 placeholder-slate-400"
               />
             </div>
 
@@ -255,7 +288,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-xs font-semibold transition-all flex items-center justify-center space-x-1 cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
-                <span>Quick Add</span>
+                <span>Add</span>
               </button>
             </div>
           </form>
@@ -264,9 +297,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h2 className="font-bold text-slate-900 text-lg">Daily Task Checklist</h2>
+                <h2 className="font-bold text-slate-900 text-base sm:text-lg">Daily Task Checklist</h2>
                 <p className="text-xs text-slate-500">
-                  Check off items as you finish them or click for full task management
+                  {completedTasks} completed • {pendingTasks} pending
                 </p>
               </div>
 
@@ -276,7 +309,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   className="text-xs font-semibold text-blue-600 hover:text-blue-700 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100/70 transition-colors flex items-center space-x-1"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>New Detailed Task</span>
+                  <span>Detailed Task</span>
                 </button>
                 <button
                   onClick={() => setActiveTab('tasks')}
@@ -357,7 +390,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
                           <span>⏱️ {task.estimatedMinutes}m</span>
                           {task.deadline && (
-                            <span className="text-amber-700 font-medium">
+                            <span className="text-amber-700 font-semibold bg-amber-50 px-1.5 py-0.2 rounded">
                               📅 {task.deadline}
                             </span>
                           )}
@@ -387,8 +420,65 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right 1 Column: AI Daily Schedule Card & Micro Tips */}
+        {/* Right 1 Column: Reminders & AI Schedule Snapshot */}
         <div className="space-y-6">
+          {/* Upcoming Deadlines & Reminders Card */}
+          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-3.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-slate-900 font-bold text-sm">
+                <Bell className="w-4 h-4 text-amber-500" />
+                <span>Upcoming Reminders</span>
+              </div>
+              {notifPerm === 'granted' ? (
+                <span className="inline-flex items-center space-x-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  <BellRing className="w-3 h-3" />
+                  <span>Alerts On</span>
+                </span>
+              ) : (
+                <button
+                  onClick={handleEnableNotifications}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 hover:underline cursor-pointer"
+                >
+                  Enable alerts
+                </button>
+              )}
+            </div>
+
+            {activeReminders.length === 0 ? (
+              <p className="text-xs text-slate-500 italic bg-slate-50 p-3 rounded-xl border border-slate-100">
+                No urgent deadlines or reminders right now. You are all caught up!
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {activeReminders.map((rem) => (
+                  <div
+                    key={rem.taskId}
+                    className="p-2.5 rounded-xl border border-amber-200/70 bg-amber-50/40 text-xs flex items-start justify-between"
+                  >
+                    <div className="truncate mr-2">
+                      <div className="font-semibold text-slate-900 truncate">
+                        {rem.taskTitle}
+                      </div>
+                      <div className="text-[11px] text-amber-800 font-medium mt-0.5 flex items-center space-x-1">
+                        <Calendar className="w-3 h-3" />
+                        <span>{rem.deadline}</span>
+                      </div>
+                    </div>
+                    {rem.isUrgent && (
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 shrink-0">
+                        Urgent
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[10px] text-slate-400">
+              * Browser notifications deliver alerts while your browser window is active.
+            </p>
+          </div>
+
           {/* AI Schedule Preview Card */}
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-5 space-y-4">
             <div className="flex items-center justify-between">
@@ -396,7 +486,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="p-1.5 rounded-lg bg-purple-100 text-purple-700">
                   <Sparkles className="w-4 h-4" />
                 </div>
-                <h3 className="font-bold text-slate-900 text-base">Gemini Daily Plan</h3>
+                <h3 className="font-bold text-slate-900 text-sm sm:text-base">Gemini Daily Plan</h3>
               </div>
               {dailyPlan && (
                 <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full border border-purple-200">
@@ -411,8 +501,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   "{dailyPlan.summary}"
                 </p>
 
-                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-                  {dailyPlan.items.slice(0, 5).map((item, idx) => (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {dailyPlan.items.slice(0, 4).map((item, idx) => (
                     <div
                       key={item.id || idx}
                       className={`p-2.5 rounded-xl border text-xs flex items-center justify-between ${
@@ -457,23 +547,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Smart Reschedule Quick Teaser */}
-          <div className="bg-gradient-to-br from-amber-500/10 via-orange-500/5 to-transparent rounded-2xl border border-amber-200/80 p-5 space-y-3">
-            <div className="flex items-center space-x-2 text-amber-900 font-bold text-sm">
-              <RefreshCw className="w-4 h-4 text-amber-600" />
-              <span>Surprise Disruption?</span>
-            </div>
-            <p className="text-xs text-amber-950 leading-relaxed">
-              If an emergency meeting or delay came up today, don't throw away your schedule. Use Smart Reschedule to balance the day in seconds.
-            </p>
-            <button
-              onClick={() => setActiveTab('reschedule')}
-              className="w-full py-2 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white rounded-xl shadow-xs transition-colors cursor-pointer"
-            >
-              Launch Smart Rescheduler →
-            </button>
           </div>
         </div>
       </div>

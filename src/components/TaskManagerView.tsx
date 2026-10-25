@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   Plus,
   Search,
@@ -12,12 +12,15 @@ import {
   Sparkles,
   ArrowUpDown,
   Download,
+  Upload,
+  Copy,
   RotateCcw,
   CheckSquare,
   Square,
   Check,
 } from 'lucide-react';
 import { Task, TaskCategory, TaskPriority } from '../types';
+import { AiAssistantBar } from './AiAssistantBar';
 import confetti from 'canvas-confetti';
 
 interface TaskManagerViewProps {
@@ -27,8 +30,12 @@ interface TaskManagerViewProps {
   onDeleteTask: (taskId: string) => void;
   onToggleTask: (taskId: string) => void;
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
+  onDuplicateTask: (task: Task) => void;
+  onImportTasks: (tasks: Task[]) => void;
   onClearCompleted: () => void;
   onResetSampleData: () => void;
+  onTaskCreatedFromAi: (task: Task) => void;
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
@@ -38,8 +45,12 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
   onDeleteTask,
   onToggleTask,
   onToggleSubtask,
+  onDuplicateTask,
+  onImportTasks,
   onClearCompleted,
   onResetSampleData,
+  onTaskCreatedFromAi,
+  showToast,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -47,6 +58,8 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'pending' | 'completed'>('all');
   const [sortBy, setSortBy] = useState<'created' | 'priority' | 'duration' | 'title'>('created');
   const [taskToDelete, setTaskToDelete] = useState<string | null>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const categories: Array<{ id: string; label: string; icon: string }> = [
     { id: 'all', label: 'All', icon: '📁' },
@@ -62,22 +75,18 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
   const filteredTasks = useMemo(() => {
     return tasks
       .filter((t) => {
-        // Search
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           const matchTitle = t.title.toLowerCase().includes(q);
           const matchDesc = t.description?.toLowerCase().includes(q);
           if (!matchTitle && !matchDesc) return false;
         }
-        // Category
         if (selectedCategory !== 'all' && t.category !== selectedCategory) {
           return false;
         }
-        // Priority
         if (selectedPriority !== 'all' && t.priority !== selectedPriority) {
           return false;
         }
-        // Status
         if (selectedStatus === 'pending' && t.completed) return false;
         if (selectedStatus === 'completed' && !t.completed) return false;
 
@@ -94,7 +103,6 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
         if (sortBy === 'title') {
           return a.title.localeCompare(b.title);
         }
-        // default: created
         return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
       });
   }, [tasks, searchQuery, selectedCategory, selectedPriority, selectedStatus, sortBy]);
@@ -107,6 +115,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
         spread: 70,
         origin: { y: 0.6 },
       });
+      showToast('Task marked as completed! 🎉', 'success');
     }
   };
 
@@ -118,12 +127,44 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+    showToast('Tasks exported to JSON file', 'info');
+  };
+
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const imported = JSON.parse(event.target?.result as string);
+        if (Array.isArray(imported)) {
+          onImportTasks(imported);
+          showToast(`Successfully imported ${imported.length} tasks!`, 'success');
+        } else {
+          showToast('Invalid JSON file format.', 'error');
+        }
+      } catch (err) {
+        showToast('Error reading tasks file.', 'error');
+      }
+    };
+    reader.readAsText(file);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const completedCount = tasks.filter((t) => t.completed).length;
 
   return (
     <div className="space-y-6 pb-14">
+      {/* Hidden file input for import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImportFile}
+        accept=".json"
+        className="hidden"
+      />
+
       {/* Top Banner & Action Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
@@ -134,11 +175,20 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
             </span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Add, organize, and break down daily obligations. Data auto-saves to browser local storage.
+            Create, break down, and organize daily tasks. Persisted automatically in browser local storage.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
+            title="Import tasks from JSON file"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Import</span>
+          </button>
+
           <button
             onClick={handleExportJSON}
             className="px-3 py-2 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/70 rounded-xl transition-colors flex items-center space-x-1.5 cursor-pointer"
@@ -154,7 +204,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
             title="Reset to hackathon sample tasks"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Sample Tasks</span>
+            <span className="hidden sm:inline">Sample Data</span>
           </button>
 
           {completedCount > 0 && (
@@ -177,6 +227,9 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
         </div>
       </div>
 
+      {/* Natural language AI input bar right inside task manager */}
+      <AiAssistantBar onTaskCreated={onTaskCreatedFromAi} showToast={showToast} />
+
       {/* Filter & Search Bar */}
       <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs space-y-3">
         {/* Top row: search & dropdowns */}
@@ -188,7 +241,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks by name or notes..."
+              placeholder="Search tasks by title, notes, or category..."
               className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white"
             />
           </div>
@@ -319,7 +372,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                     <div className="space-y-1.5 flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3
-                          className={`text-base font-bold tracking-tight ${
+                          className={`text-sm sm:text-base font-bold tracking-tight ${
                             isCompleted ? 'line-through text-slate-400' : 'text-slate-900'
                           }`}
                         >
@@ -387,7 +440,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                         )}
                       </div>
 
-                      {/* Subtasks checklist preview */}
+                      {/* Subtasks checklist */}
                       {task.subtasks && task.subtasks.length > 0 && (
                         <div className="pt-2.5 mt-2 border-t border-slate-100 space-y-1.5">
                           {task.subtasks.map((st) => (
@@ -422,8 +475,15 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Right Actions: Edit & Delete */}
+                  {/* Right Actions: Duplicate, Edit, Delete */}
                   <div className="flex items-center space-x-1 shrink-0">
+                    <button
+                      onClick={() => onDuplicateTask(task)}
+                      className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
+                      title="Duplicate task"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => onEditTask(task)}
                       className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors cursor-pointer"
@@ -456,7 +516,7 @@ export const TaskManagerView: React.FC<TaskManagerViewProps> = ({
             <div className="text-center space-y-1">
               <h3 className="font-bold text-slate-900 text-base">Delete this task?</h3>
               <p className="text-xs text-slate-500">
-                This action cannot be undone. It will remove this task from your list and local storage.
+                This will remove the task from your schedule and browser local storage.
               </p>
             </div>
             <div className="flex items-center justify-end space-x-2 pt-2">

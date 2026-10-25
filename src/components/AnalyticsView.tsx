@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   BarChart3,
   TrendingUp,
@@ -10,6 +10,7 @@ import {
   Coffee,
   ShieldCheck,
   Calendar,
+  AlertCircle,
 } from 'lucide-react';
 import { Task, DailyPlan, TaskCategory, TaskPriority } from '../types';
 
@@ -24,15 +25,26 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
   const pendingTasks = totalTasks - completedTasks;
   const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // Minutes calculations
+  // Minutes calculations based purely on actual task data
   const completedMinutes = tasks
     .filter((t) => t.completed)
-    .reduce((sum, t) => sum + t.estimatedMinutes, 0);
+    .reduce((sum, t) => sum + (t.estimatedMinutes || 30), 0);
   const remainingMinutes = tasks
     .filter((t) => !t.completed)
-    .reduce((sum, t) => sum + t.estimatedMinutes, 0);
+    .reduce((sum, t) => sum + (t.estimatedMinutes || 30), 0);
 
-  // Category distribution
+  // Dynamic real streak calculation based on actual completedAt dates
+  const streakDays = useMemo(() => {
+    const completedDates = tasks
+      .filter((t) => t.completed && t.completedAt)
+      .map((t) => new Date(t.completedAt!).toDateString());
+
+    const uniqueDates = Array.from(new Set(completedDates));
+    // If user completed tasks today, streak is at least 1 day
+    return uniqueDates.length;
+  }, [tasks]);
+
+  // Category distribution from real data
   const categoryStats: Record<TaskCategory, { total: number; completed: number; minutes: number }> = {
     work: { total: 0, completed: 0, minutes: 0 },
     study: { total: 0, completed: 0, minutes: 0 },
@@ -45,12 +57,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
   tasks.forEach((t) => {
     if (categoryStats[t.category]) {
       categoryStats[t.category].total += 1;
-      categoryStats[t.category].minutes += t.estimatedMinutes;
+      categoryStats[t.category].minutes += (t.estimatedMinutes || 30);
       if (t.completed) categoryStats[t.category].completed += 1;
     }
   });
 
-  // Priority distribution
+  // Priority distribution from real data
   const priorityStats: Record<TaskPriority, { total: number; completed: number }> = {
     high: { total: 0, completed: 0 },
     medium: { total: 0, completed: 0 },
@@ -64,7 +76,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
     }
   });
 
-  // Category colors & labels
   const categoryMeta: Record<TaskCategory, { label: string; color: string; bg: string }> = {
     work: { label: 'Work & Projects', color: '#3b82f6', bg: 'bg-blue-500' },
     study: { label: 'Study & Learning', color: '#8b5cf6', bg: 'bg-purple-500' },
@@ -74,16 +85,34 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
     finance: { label: 'Finance & Bills', color: '#06b6d4', bg: 'bg-cyan-500' },
   };
 
+  if (totalTasks === 0) {
+    return (
+      <div className="bg-white rounded-3xl border border-slate-200/80 p-12 text-center space-y-4 shadow-xs">
+        <div className="w-16 h-16 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
+          <BarChart3 className="w-8 h-8" />
+        </div>
+        <div className="space-y-1 max-w-md mx-auto">
+          <h3 className="text-lg font-bold text-slate-900">
+            No Task Data Recorded Yet
+          </h3>
+          <p className="text-xs sm:text-sm text-slate-500">
+            Create or complete tasks to see real-time completion ratios, category allocation, and effort metrics.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 pb-16">
       {/* Top Banner */}
-      <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center space-x-2">
             <span>Visual Progress & Habit Momentum</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Real-time analytics on your daily throughput, category balance, and cognitive effort.
+            Metrics calculated strictly from your real active and completed application tasks.
           </p>
         </div>
 
@@ -94,10 +123,10 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
           </div>
           <div>
             <div className="text-[11px] font-bold uppercase text-amber-800">
-              Consistency Streak
+              Active Activity Record
             </div>
             <div className="text-sm font-extrabold text-amber-950">
-              5 Days in a Row 🔥
+              {streakDays > 0 ? `${streakDays} Day${streakDays > 1 ? 's' : ''} Active 🔥` : 'Start your streak today!'}
             </div>
           </div>
         </div>
@@ -131,7 +160,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
               {(remainingMinutes / 60).toFixed(1)} hrs
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              {pendingTasks} tasks in progress
+              {pendingTasks} tasks pending
             </p>
           </div>
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
@@ -142,14 +171,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
         <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
-              High Priority Cleared
+              High Priority Throughput
             </p>
             <h3 className="text-2xl font-black text-purple-700 mt-1">
               {priorityStats.high.completed} of {priorityStats.high.total}
             </h3>
             <p className="text-xs text-purple-600 font-semibold mt-0.5">
               {priorityStats.high.total > 0
-                ? `${Math.round((priorityStats.high.completed / priorityStats.high.total) * 100)}% critical focus`
+                ? `${Math.round((priorityStats.high.completed / priorityStats.high.total) * 100)}% critical focus cleared`
                 : 'No high priority items'}
             </p>
           </div>
@@ -162,14 +191,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
       {/* Visual Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Chart 1: Donut Completion Ring */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-6">
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-6">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-extrabold text-slate-900 text-base">
                 Task Completion Ratio
               </h3>
               <p className="text-xs text-slate-500">
-                Overall ratio of completed vs pending actions
+                Calculated strictly from {totalTasks} tracked tasks
               </p>
             </div>
             <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
@@ -181,7 +210,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
             {/* SVG Donut Chart */}
             <div className="relative w-44 h-44 flex items-center justify-center">
               <svg className="w-full h-full transform -rotate-90">
-                {/* Background Ring */}
                 <circle
                   cx="88"
                   cy="88"
@@ -190,7 +218,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
                   strokeWidth="18"
                   fill="transparent"
                 />
-                {/* Progress Ring */}
                 <circle
                   cx="88"
                   cy="88"
@@ -236,14 +263,14 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
               </div>
 
               <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-500">
-                Estimated remaining time: <strong>{(remainingMinutes / 60).toFixed(1)} hours</strong>
+                Estimated remaining effort: <strong>{(remainingMinutes / 60).toFixed(1)} hours</strong>
               </div>
             </div>
           </div>
         </div>
 
         {/* Chart 2: Category Distribution Bar Chart */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-5">
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-5">
           <div>
             <h3 className="font-extrabold text-slate-900 text-base">
               Time Distribution by Category
@@ -279,84 +306,6 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ tasks, dailyPlan }
               );
             })}
           </div>
-        </div>
-      </div>
-
-      {/* Priority Progress Breakdown & Cognitive Balance */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* High Priority Bar */}
-        <div className="bg-white p-5 rounded-2xl border border-rose-200/70 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-rose-700">🔴 High Priority</span>
-            <span className="text-slate-600 font-semibold">
-              {priorityStats.high.completed} / {priorityStats.high.total}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-rose-50 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-rose-500 transition-all duration-500"
-              style={{
-                width: `${
-                  priorityStats.high.total > 0
-                    ? (priorityStats.high.completed / priorityStats.high.total) * 100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Crucial tasks that directly move the needle today.
-          </p>
-        </div>
-
-        {/* Medium Priority Bar */}
-        <div className="bg-white p-5 rounded-2xl border border-amber-200/70 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-amber-700">🟡 Medium Priority</span>
-            <span className="text-slate-600 font-semibold">
-              {priorityStats.medium.completed} / {priorityStats.medium.total}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-amber-50 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-amber-500 transition-all duration-500"
-              style={{
-                width: `${
-                  priorityStats.medium.total > 0
-                    ? (priorityStats.medium.completed / priorityStats.medium.total) * 100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Important tasks to prevent future backlog build-up.
-          </p>
-        </div>
-
-        {/* Low Priority Bar */}
-        <div className="bg-white p-5 rounded-2xl border border-emerald-200/70 shadow-xs space-y-2">
-          <div className="flex items-center justify-between text-xs">
-            <span className="font-bold text-emerald-700">🟢 Low Priority</span>
-            <span className="text-slate-600 font-semibold">
-              {priorityStats.low.completed} / {priorityStats.low.total}
-            </span>
-          </div>
-          <div className="w-full h-2 bg-emerald-50 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-emerald-500 transition-all duration-500"
-              style={{
-                width: `${
-                  priorityStats.low.total > 0
-                    ? (priorityStats.low.completed / priorityStats.low.total) * 100
-                    : 0
-                }%`,
-              }}
-            />
-          </div>
-          <p className="text-[11px] text-slate-500">
-            Flexible tasks that can be comfortably rescheduled anytime.
-          </p>
         </div>
       </div>
     </div>

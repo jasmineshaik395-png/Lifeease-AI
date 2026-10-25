@@ -61,7 +61,7 @@ export const BeginnerGuideModal: React.FC<BeginnerGuideModalProps> = ({
           <div className="p-4 bg-blue-50/70 border border-blue-200/60 rounded-2xl space-y-2">
             <h3 className="font-bold text-blue-950 flex items-center space-x-2 text-sm">
               <Lightbulb className="w-4 h-4 text-blue-600" />
-              <span>Theme: "Reimagine Everyday Life – Make the Complex Simple"</span>
+              <span>Theme 2: "Reimagine Everyday Life — Make the Complex Simple"</span>
             </h3>
             <p className="text-xs text-blue-900 leading-relaxed">
               Every day, people struggle with scattered to-do lists, unpredictable disruptions, and cognitive burnout.

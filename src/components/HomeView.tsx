@@ -43,7 +43,7 @@ export const HomeView: React.FC<HomeViewProps> = ({
           <div className="inline-flex items-center space-x-2 px-4 py-1.5 rounded-full bg-blue-50/90 border border-blue-200/80 shadow-xs">
             <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-ping" />
             <span className="text-xs sm:text-sm font-semibold text-blue-900">
-              Hackathon Theme: Reimagine Everyday Life – Make the Complex Simple
+              Theme 2: Reimagine Everyday Life — Make the Complex Simple
             </span>
           </div>
 
@@ -63,10 +63,10 @@ export const HomeView: React.FC<HomeViewProps> = ({
           </p>
 
           {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
             <button
               onClick={onGetStarted}
-              className="w-full sm:w-auto px-8 py-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-bold text-base shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center space-x-2 group cursor-pointer"
+              className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-bold text-sm sm:text-base shadow-lg shadow-blue-500/30 hover:shadow-xl hover:shadow-blue-500/40 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center space-x-2 group cursor-pointer"
             >
               <span>Get Started Free</span>
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -74,10 +74,17 @@ export const HomeView: React.FC<HomeViewProps> = ({
 
             <button
               onClick={() => setActiveTab('planner')}
-              className="w-full sm:w-auto px-7 py-4 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-semibold text-base border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex items-center justify-center space-x-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-semibold text-sm sm:text-base border border-slate-200 shadow-xs hover:border-slate-300 transition-all flex items-center justify-center space-x-2 cursor-pointer"
             >
-              <Sparkles className="w-5 h-5 text-purple-600" />
+              <Sparkles className="w-4 h-4 text-purple-600" />
               <span>Try Gemini AI Planner</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('gemini')}
+              className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-800 font-semibold text-sm sm:text-base border border-purple-200 shadow-xs transition-all flex items-center justify-center space-x-2 cursor-pointer"
+            >
+              <span>💬 Chat with Gemini</span>
             </button>
           </div>
 
